@@ -1,0 +1,9 @@
+{
+	"name": "adfexploration01",
+	"location": "southeastasia",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "3f725337-c2e4-49fe-8b3e-d27ff55a5845",
+		"tenantId": "44e01495-4a0b-4c60-88aa-3f732b0e0940"
+	}
+}
