@@ -1,0 +1,51 @@
+{
+	"name": "dataflow1",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "CustomerSource",
+						"type": "DatasetReference"
+					},
+					"name": "CustomerSource"
+				},
+				{
+					"dataset": {
+						"referenceName": "DimCustomer",
+						"type": "DatasetReference"
+					},
+					"name": "DimCustomer"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DimCustomer",
+						"type": "DatasetReference"
+					},
+					"name": "SinkDimCustomer"
+				}
+			],
+			"transformations": [
+				{
+					"name": "CreateCustomerHashkey"
+				},
+				{
+					"name": "Exists1"
+				},
+				{
+					"name": "Lookup1"
+				},
+				{
+					"name": "SetDates"
+				},
+				{
+					"name": "Upsert"
+				}
+			],
+			"script": "source(output(\n\t\tCustomerID as integer,\n\t\tFirstName as string,\n\t\tMiddleName as string,\n\t\tLastName as string,\n\t\tPhone as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> CustomerSource\nsource(output(\n\t\tCustomerID as integer,\n\t\tFirstName as string,\n\t\tMiddleName as string,\n\t\tLastName as string,\n\t\tPhone as string,\n\t\tInsertedDate as timestamp,\n\t\tModifiedDate as timestamp,\n\t\tHashKey as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> DimCustomer\nCustomerSource derive(HashKey = sha1(FirstName,MiddleName,LastName,Phone)) ~> CreateCustomerHashkey\nCreateCustomerHashkey, DimCustomer exists(CreateCustomerHashkey@HashKey == DimCustomer@HashKey,\n\tnegate:true,\n\tbroadcast: 'auto')~> Exists1\nExists1, DimCustomer lookup(CustomerSource@CustomerID == DimCustomer@CustomerID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> Lookup1\nLookup1 derive(InsertedDate = iif(isNull(InsertedDate), currentTimestamp(), {InsertedDate}),\n\t\tModifiedDate = currentTimestamp()) ~> SetDates\nSetDates alterRow(upsertIf(true())) ~> Upsert\nUpsert sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tCustomerID as integer,\n\t\tFirstName as string,\n\t\tMiddleName as string,\n\t\tLastName as string,\n\t\tPhone as string,\n\t\tInsertedDate as timestamp,\n\t\tModifiedDate as timestamp,\n\t\tHashKey as string\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['CustomerID'],\n\tformat: 'table',\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError',\n\tmapColumn(\n\t\tCustomerID = CustomerSource@CustomerID,\n\t\tFirstName = CustomerSource@FirstName,\n\t\tMiddleName = CustomerSource@MiddleName,\n\t\tLastName = CustomerSource@LastName,\n\t\tPhone = CustomerSource@Phone,\n\t\tInsertedDate,\n\t\tModifiedDate,\n\t\tHashKey = CreateCustomerHashkey@HashKey\n\t)) ~> SinkDimCustomer"
+		}
+	}
+}
